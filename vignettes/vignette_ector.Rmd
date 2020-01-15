@@ -1,7 +1,7 @@
 ---
-title: "ector"
-subtitle: "Ectopic gene expression using R"
-author: "Mélanie Petrier"
+title: "`ector`: Ectopic gene expression using R"
+subtitle: "TCGA-COAD case study"
+author: "Mélanie Petrier, Ekatarina Flin, Florent Chuffart, Sophie Rousseaux"
 contact: 
 date: "`r Sys.Date()`"
 output: 
@@ -20,65 +20,131 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```
 
 
-1 Introduction
-ECTOR is a R package that detects ectopic gene expression in cancer, according to a threshold determined from normal samples. ECTOR analyses then the impact of abnormal expression of these genes in patient survival, allowing the detection of potential biomarkers of cancer aggressiveness.
 
-2 Dataset and data filtering
-2.1 Dataset
+
+
+# Introduction
+
+ECTOR is a R package that detects ectopic gene expression in cancer, according to a threshold determined from normal samples. 
+ECTOR analyses then the impact of abnormal expression of these genes in patient survival, allowing the detection of potential biomarkers of cancer aggressiveness.
+
+# Dataset and data filtering
+
+## Dataset
+
 The illustration of the method required the import of transcriptomic data (RNAseq) of 25.360 genes for 499 samples and clinical data (experimental grouping) of 560 samples from the TCGA study of colon adenocarcinoma. The list of tissue-restricted genes (testis, placenta, embryonic stem cells and brain) has also been imported from the Epimed database.
+
 exp_grp is a data matrix containing clinical information for 560 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose the ID is given in the first column (id_sample).
-Code
-d  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (s$data). The rownames and colnames represent respectively the gene symbols and sample ID.
-Code
-ts_genes is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
-Code
+
+```{r}
+
+```
  
-2.2 Data filtering
+d  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (s$data). The rownames and colnames represent respectively the gene symbols and sample ID.
+
+```{r}
+
+```
+
+ts_genes is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
+
+```{r}
+
+```
+ 
+## Data filtering
+
 Elimination of samples in exp_grp which are missing in d:
 Since not all the samples from exp_grp are found in d, the first step is to eliminate in exp_grp the clinical informations of samples which do not appear in d.
 tmp_idx is a list of characters representing the samples ID found both in d and exp_grp.
 e represents the data matrix exp_grp without the samples missing in d, containing then the informations for 499 samples (41 normal and 458 tumorous samples).
-Code
+
+```{r}
+
+```
+
 Organization of e:
 idx_n indicates the ID of normal samples and idx_c indicates the ID of cancerous samples.
-Code
+
+
+```{r}
+
+```
+
+
 
 Elimination of non tissue-restricted genes in d:
 genes is a list of characters representing the gene symbols found both in ts_genes and d.
 d now contains the RNAseq counts for tissue-restricted genes only for each of the 499 samples. d is then now made of 1297 rows.
-Code
 
-3 Method
-3.1 Establishment of gene expression threshold
+
+```{r}
+
+```
+
+
+
+# Method
+
+## Establishment of gene expression threshold
+
 In order to know if genes are abnormally expressed in cancerous samples, it is required to establish a threshold from normal samples for all genes. The formula commonly used is mean(x) + 3*sd(x), x being the expression of a given gene in normal samples.
 m3sd is the function used to determine the threshold for each gene and uses only data from normal samples (idx_n). The function is then applied for each gene in the data matrix d.
-Code
 
-3.2 Plotting gene expression
+```{r}
+
+```
+
+
+
+## Plotting gene expression
+
 It is possible to visualize approximately the number of samples where a given gene is abnormally expressed.
 figure is a function to draw a plot where each sample is represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
 The plot contains also the lines corresponding to the mean and the threshold (m3sd) of the given gene and the dots found above the threshold are colored in red.
-Code
 
 
-3.3 Determination of ectopically expressed genes
+```{r}
+
+```
+
+
+
+## Determination of ectopically expressed genes
+
 In order to know if a gene is ectopically expressed in cancerous samples, it is required to compare their expression with the corresponding threshold.
 prop_aberrant_expr is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
 candidates indicates the gene symbols that have an aberrant expression in at least 10% of patients. 
-Code
 
-3.4 Survival curve
+
+```{r}
+
+```
+
+
+## Survival curve
+
 The drawing of Kaplan-Meier curves required the use of a survival function from the epimedtools package. This function needed the time and censor survival parameters of patients, contained in e. Patients are divided into two groups : low or high gene expression compared to the threshold, implemented by the argument v.
 graphs allows to apply this function to each of the 210 genes and returns p-values and hazard ratios.
-Code
 
-3.5 Biomarkers
+
+```{r}
+
+```
+
+
+## Biomarkers
+
 The survival function not only allow to draw graphs but also to obtain p_values and hazard ratios.
 p_value indicates the cox p_value for each gene analyzed with Cox model.
 biomarkers gives the gene symbol for each gene whose cox p_value is less than 0.05.
-Code
 
-4 Material and methods
+```{r}
+
+```
+
+
+# Material and methods
 
 
 
