@@ -1,7 +1,7 @@
 ---
 title: "`ector`: Ectopic gene expression using R"
 subtitle: "TCGA-COAD case study"
-author: "Mélanie Petrier, Ekatarina Flin, Florent Chuffart, Sophie Rousseaux"
+author: "Mélanie Petrier, Ekaterina Flin, Florent Chuffart, Sophie Rousseaux"
 contact: 
 date: "`r Sys.Date()`"
 output: 
@@ -28,58 +28,87 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ECTOR is a R package that detects ectopic gene expression in cancer, according to a threshold determined from normal samples. 
 ECTOR analyses then the impact of abnormal expression of these genes in patient survival, allowing the detection of potential biomarkers of cancer aggressiveness.
 
+
+
 # Dataset and data filtering
 
 ## Dataset
 
-The illustration of the method required the import of transcriptomic data (RNAseq) of 25.360 genes for 499 samples and clinical data (experimental grouping) of 560 samples from the TCGA study of colon adenocarcinoma. The list of tissue-restricted genes (testis, placenta, embryonic stem cells and brain) has also been imported from the Epimed database.
+The illustration of the method required the import of transcriptomic data (RNAseq) of 25.360 genes for 499 samples and clinical data (experimental grouping) of 547 samples from the TCGA study of colon adenocarcinoma. The list of tissue-restricted genes (testis, placenta, embryonic stem cells and brain) has also been imported from the Epimed database.
 
-exp_grp is a data matrix containing clinical information for 560 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose the ID is given in the first column (id_sample).
+`exp_grp` is a data matrix containing clinical information for 547 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
+
 
 ```{r}
-
+exp_grp = epimedtools::get_tcga_exp_grp(tcga_project="TCGA-COAD")
+head(exp_grp[,1:4])
+dim(exp_grp)
 ```
  
-d  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (s$data). The rownames and colnames represent respectively the gene symbols and sample ID.
+ 
+`d`  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
 
 ```{r}
-
+s = readRDS("~/projects/tcga_studies/study_TCGA-COAD_trscr.rds")
+d = s$data
+head(d[,1:4])
+dim(d)
 ```
 
-ts_genes is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
+
+`ts_genes` is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
 
 ```{r}
-
+url = "http://epimed.univ-grenoble-alpes.fr/database/query/genes?annotations=epimed_tsg2_restricted_1_testis_adult,epimed_tsg2_restricted_1_placenta_adult,epimed_tsg2_restricted_1_embryonic_stem_cells_embryonic,epimed_tsg2_restricted_1_brain_adult&taxid=9606"
+ts_genes = read.csv2(url, header=TRUE, sep=";")
+head(ts_genes[,1:4])
+dim(ts_genes)
 ```
+ 
+ 
  
 ## Data filtering
 
-Elimination of samples in exp_grp which are missing in d:
-Since not all the samples from exp_grp are found in d, the first step is to eliminate in exp_grp the clinical informations of samples which do not appear in d.
-tmp_idx is a list of characters representing the samples ID found both in d and exp_grp.
-e represents the data matrix exp_grp without the samples missing in d, containing then the informations for 499 samples (41 normal and 458 tumorous samples).
+Elimination of samples in `exp_grp` which are missing in `d`:
+Since not all the samples from `exp_grp` are found in `d`, the first step is to eliminate in `exp_grp` the clinical informations of samples which do not appear in `d`.
+`tmp_idx` is a list of characters representing the samples ID found both in `d` and `exp_grp`.
+`e` represents the data matrix `exp_grp` without the samples missing in `d`, containing then the informations for 499 samples (41 normal and 458 tumorous samples).
 
 ```{r}
-
-```
-
-Organization of e:
-idx_n indicates the ID of normal samples and idx_c indicates the ID of cancerous samples.
-
-
-```{r}
-
+rownames(exp_grp) = exp_grp$id_sample
+tmp_idx = intersect(colnames(d), rownames(exp_grp))
+e = exp_grp[tmp_idx,]                               
+head(e[,1:4])
+dim(e)
 ```
 
 
-
-Elimination of non tissue-restricted genes in d:
-genes is a list of characters representing the gene symbols found both in ts_genes and d.
-d now contains the RNAseq counts for tissue-restricted genes only for each of the 499 samples. d is then now made of 1297 rows.
+Organization of `e`:
+`idx_n` indicates the ID of normal samples and `idx_c` indicates the ID of cancerous samples.
 
 
 ```{r}
+idx_n = rownames(e)[e$tissue_status %in% "normal"]  
+head(idx_n)
+length(idx_n)
+idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
+head(idx_c)
+length(idx_c)
+```
 
+
+Elimination of non tissue-restricted genes in `d`:
+`genes` is a list of characters representing the gene symbols found both in `ts_genes` and `d`.
+`d` now contains the RNAseq counts for tissue-restricted genes only for each of the 499 samples. `d` is thus now made of 1297 rows.
+
+
+```{r}
+genes = intersect(rownames(d), ts_genes$gene_symbol)
+head(genes)
+length(genes)
+d = d[genes,]
+head(d[,1:4])
+dim(d)
 ```
 
 
@@ -89,10 +118,16 @@ d now contains the RNAseq counts for tissue-restricted genes only for each of th
 ## Establishment of gene expression threshold
 
 In order to know if genes are abnormally expressed in cancerous samples, it is required to establish a threshold from normal samples for all genes. The formula commonly used is mean(x) + 3*sd(x), x being the expression of a given gene in normal samples.
-m3sd is the function used to determine the threshold for each gene and uses only data from normal samples (idx_n). The function is then applied for each gene in the data matrix d.
+`m3sd` is the function used to determine the threshold for each gene and uses only data from normal samples (`idx_n`). The function is then applied for each gene in the data matrix `d`.
 
 ```{r}
+m3sd = function(x) {
+  mean(x)+(3*sd(x))
+}
 
+thresh = apply(d[,idx_n], 1, m3sd)
+head(thresh)
+length(thresh)
 ```
 
 
@@ -100,11 +135,25 @@ m3sd is the function used to determine the threshold for each gene and uses only
 ## Plotting gene expression
 
 It is possible to visualize approximately the number of samples where a given gene is abnormally expressed.
-figure is a function to draw a plot where each sample is represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
+`figure` is a function to draw a plot where each sample is represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
 The plot contains also the lines corresponding to the mean and the threshold (m3sd) of the given gene and the dots found above the threshold are colored in red.
 
 
 ```{r}
+plot_gene_expr = function(gs, d, idx_n, e, thresh_func=m3sd) {
+  expr = d[gs,]
+  plot(jitter(as.numeric(as.factor(e$tissue_status))), expr, 
+  xlab=" ", ylab="Expression", xaxt = "n",
+       col = (expr>thresh_func(expr[idx_n]))+1, 
+       main=gs
+  )
+  tmp_tab = table(e$tissue_status)
+  axis(1, at = 1:2, paste0(names(tmp_tab)," (n=", tmp_tab, ")"), las = 1)
+  abline(h=thresh_func(expr[idx_n]), col="red")
+  abline(h=mean(expr[idx_n]), col="black")
+  legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
+}
+
 
 ```
 
@@ -113,38 +162,91 @@ The plot contains also the lines corresponding to the mean and the threshold (m3
 ## Determination of ectopically expressed genes
 
 In order to know if a gene is ectopically expressed in cancerous samples, it is required to compare their expression with the corresponding threshold.
-prop_aberrant_expr is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
-candidates indicates the gene symbols that have an aberrant expression in at least 10% of patients. 
+`prop_aberrant_expr` is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
+`candidates` indicates the gene symbols that have an aberrant expression in at least 10% of patients. 
 
 
 ```{r}
+prop_ectopic_expr = function(x, idx_c, idx_n, thresh_func=m3sd) {
+  if (sum(is.na(x)) > 0) {
+    warning("NA is expression values.")    
+  }
+  y = x[idx_c]>thresh_func(x[idx_n])
+  res = sum(y)/length(idx_c)
+  return(res)
+}
+
+ectopic_activation = apply(d, 1, prop_ectopic_expr, idx_c, idx_n)
+head(ectopic_activation)
+length(ectopic_activation)
+candidates = names(ectopic_activation)[ectopic_activation>0.1]
+length(candidates)
 
 ```
 
 
-## Survival curve
+## Survival
 
-The drawing of Kaplan-Meier curves required the use of a survival function from the epimedtools package. This function needed the time and censor survival parameters of patients, contained in e. Patients are divided into two groups : low or high gene expression compared to the threshold, implemented by the argument v.
-graphs allows to apply this function to each of the 210 genes and returns p-values and hazard ratios.
+### p-values
+
+The influence of ectopic gene expression on patient survival is determined by the calculation of cox p-values by using the function `compute_cox_pv`.
+`pvs` allows to apply this function to every candidate gene.
+`biomarkers` gives the gene symbol for each gene whose cox p-value is less than 0.05.
 
 
 ```{r}
+compute_cox_pv = function (x, idx_c, idx_n, e, thresh_func=m3sd) {
+  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+  v = x[idx_c]>thresh_func(x[idx_n])
+  f = suppressWarnings(survival::coxph(ss ~ v))
+  sf = summary(f)
+  pvcox = sf$logtest[3]
+  return(pvcox)
+}
+
+pvs = sort(apply(d[candidates,], 1, compute_cox_pv, idx_c, idx_n, e))
+biomarkers = names(pvs)[pvs<=0.05]
+biomarkers
+
 
 ```
 
 
-## Biomarkers
+### Curves
 
-The survival function not only allow to draw graphs but also to obtain p_values and hazard ratios.
-p_value indicates the cox p_value for each gene analyzed with Cox model.
-biomarkers gives the gene symbol for each gene whose cox p_value is less than 0.05.
+As for p-values, the function drawing survival curves (`plot_survival`) requires time and censor of survival. Patients are divided in two groups, depending on the activation status of a given gene (on or off). `plot_survival` is then applied to the previously determined `biomarkers`.
+
 
 ```{r}
+plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=m3sd) {
+  expr = d[gs,]
+  pv = compute_cox_pv(expr, idx_c, idx_n, e, thresh_func=m3sd)
+  
+  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+  v = expr[idx_c]>thresh_func(expr[idx_n])
+  sf = survival::survfit(ss ~ v)
+  plot(
+    sf, 
+    xlab="Time in months", 
+    ylab="Overall survival", 
+    main=paste0(gs, " pv_cox=", signif(pv, 3)),
+    col=c(4,2)
+  )
+  legend("topright", c("Off", "On"), lty=1, col=c(4,2))
+}
 
+layout(matrix(1:2,1), respect=TRUE)
+graphs = sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
 ```
+
+
+
 
 
 # Material and methods
+
+
+
 
 
 
