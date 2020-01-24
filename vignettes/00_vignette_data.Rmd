@@ -1,0 +1,130 @@
+---
+title: "`ector`: Ectopic gene expression using R"
+subtitle: "Generate dataset for the package"
+author: "Mélanie Petrier, Ekaterina Flin, Florent Chuffart, Sophie Rousseaux"
+contact: 
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=TRUE, results="verbatim", dpi=75)
+```
+
+
+# Restricted genes
+
+```{r}
+url = "http://epimed.univ-grenoble-alpes.fr/database/query/genes?annotations=epimed_tsg2_restricted_1_testis_adult,epimed_tsg2_restricted_1_placenta_adult,epimed_tsg2_restricted_1_embryonic_stem_cells_embryonic,epimed_tsg2_restricted_1_brain_adult&taxid=9606"
+genes = read.csv2(url, header=TRUE, sep=";")
+head(genes[,1:4])
+dim(genes)
+
+
+#' Update vector of genes using epimed API
+#'
+#' This function updates vector of genes using epimed API
+#' @param genes_to_update a vector of genes to be updated
+#' @param jobid the id of the job if job exists
+#' @param taxid the name of the taxonomy to refer (9606 for homo spaiens, 10090 for mus musculus)
+#' @param assembly the name of the assembly to refer
+#' @param WAIT a bolean indicating if call to service is synchrone or assynchrone
+#' @importFrom httr POST
+#' @importFrom jsonlite fromJSON
+#' @export
+epimed_api_position = function(genes_to_position, jobid, assembly="GRCh38", taxid=9606, WAIT=TRUE) {
+  if (missing(jobid)) {
+    url = "http://epimed.univ-grenoble-alpes.fr/database/query/jobid"
+    jobid = jsonlite::fromJSON(url)    
+    print(paste0("create job ", jobid))
+    # url = "http://epimed.univ-grenoble-alpes.fr/database/query/genes/update"
+    # body = list(jobid=jobid, symbols=paste(genes_to_update, collapse=", "), taxid=taxid)
+    # response = httr::POST(url, body = body, encode = "form")
+
+    url = "http://epimed.univ-grenoble-alpes.fr/database/query/genes/position"
+    body=list(jobid=jobid, symbols=paste(genes_to_position, collapse=", "), assembly=assembly, positionType="unique", taxid=taxid)
+    response = httr::POST(url, body = body, encode = "form")
+  }
+
+  url = paste0("http://epimed.univ-grenoble-alpes.fr/database/query/jobstatus?jobid=", jobid)
+  job = jsonlite::fromJSON(url)
+  while (job$status != "success" & WAIT) {
+    print(paste0("job:", job$jobid, " ", job$status, " ", job$current, "/", job$total))
+    system("sleep 2")
+    job = jsonlite::fromJSON(url)
+  }
+  print(paste0("job:", job$jobid, " ", job$status, " ", job$current, "/", job$total))
+
+  url = paste0("http://epimed.univ-grenoble-alpes.fr/database/query/jobs?format=bed&jobid=", jobid)
+  foo = read.csv2(url, header=TRUE, sep=";", stringsAsFactors=FALSE)
+  return(foo)
+}
+
+bed_genes = epimed_api_position(genes$entrez, jobid="20200120165632730R975")
+head(bed_genes)
+dim(bed_genes)
+ector_tissue_specific_genes = bed_genes[,1:7]
+save(ector_tissue_specific_genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
+```
+
+
+`restricted_genes` is a data.frame describing tissue-restricted genes (`r nrow(genes)` genes in total). 
+The rows correspond to genes while the columns correspond to their related informations.
+
+
+
+# Clinicals
+
+`exp_grp` is a data matrix containing clinical information for 547 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
+
+
+```{r}
+exp_grp = epimedtools::get_tcga_exp_grp(tcga_project="TCGA-COAD")
+head(exp_grp[,1:4])
+dim(exp_grp)
+ector_clinicals  = exp_grp
+save(ector_clinicals, file='~/projects/ector/data/ector_clinicals.RData' , compress='xz')
+```
+
+# Transcriptomic data
+
+`d`  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
+
+```{r}
+s = readRDS("~/projects/tcga_studies/study_TCGA-COAD_trscr.rds")
+d = s$data
+head(d[,1:4])
+dim(d)
+ector_transcriptome = d
+save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData' , compress='xz')
+```
+
+# Checking data
+
+
+```{r}
+# d is matrix
+# e is df
+# g is df
+# g is ordered by chr and position
+# g is bed inspired
+# rownames(e) == colnames(d)
+# rownames(g) == rownames(d)
+```
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
+
+

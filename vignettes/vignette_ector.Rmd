@@ -40,7 +40,8 @@ The illustration of the method required the import of transcriptomic data (RNAse
 
 
 ```{r}
-exp_grp = epimedtools::get_tcga_exp_grp(tcga_project="TCGA-COAD")
+load("~/projects/ector/data/ector_clinicals.RData")
+exp_grp = ector_clinicals
 head(exp_grp[,1:4])
 dim(exp_grp)
 ```
@@ -49,20 +50,20 @@ dim(exp_grp)
 `d`  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
 
 ```{r}
-s = readRDS("~/projects/tcga_studies/study_TCGA-COAD_trscr.rds")
-d = s$data
+load("~/projects/ector/data/ector_transcriptome.RData")
+d = ector_transcriptome
 head(d[,1:4])
 dim(d)
 ```
 
 
-`ts_genes` is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
+`genes` is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
 
 ```{r}
-url = "http://epimed.univ-grenoble-alpes.fr/database/query/genes?annotations=epimed_tsg2_restricted_1_testis_adult,epimed_tsg2_restricted_1_placenta_adult,epimed_tsg2_restricted_1_embryonic_stem_cells_embryonic,epimed_tsg2_restricted_1_brain_adult&taxid=9606"
-ts_genes = read.csv2(url, header=TRUE, sep=";")
-head(ts_genes[,1:4])
-dim(ts_genes)
+load("~/projects/ector/data/ector_tissue_specific_genes.RData")
+genes = ector_tissue_specific_genes
+head(genes[,1:4])
+dim(genes)
 ```
  
  
@@ -98,15 +99,15 @@ length(idx_c)
 
 
 Elimination of non tissue-restricted genes in `d`:
-`genes` is a list of characters representing the gene symbols found both in `ts_genes` and `d`.
+`genes_idx` is a list of characters representing the gene symbols found both in `genes` and `d`.
 `d` now contains the RNAseq counts for tissue-restricted genes only for each of the 499 samples. `d` is thus now made of 1297 rows.
 
 
 ```{r}
-genes = intersect(rownames(d), ts_genes$gene_symbol)
-head(genes)
+genes_idx = intersect(rownames(d), genes$gene_symbol)
+head(genes_idx)
 length(genes)
-d = d[genes,]
+d = d[genes_idx,]
 head(d[,1:4])
 dim(d)
 ```
