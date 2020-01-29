@@ -30,20 +30,18 @@ ECTOR analyses then the impact of abnormal expression of these genes in patient 
 
 
 
-# Dataset and data filtering
+# Dataset
 
-## Dataset
 
 The illustration of the method required the import of transcriptomic data (RNAseq) of 25.360 genes for 499 samples and clinical data (experimental grouping) of 547 samples from the TCGA study of colon adenocarcinoma. The list of tissue-restricted genes (testis, placenta, embryonic stem cells and brain) has also been imported from the Epimed database.
 
-`exp_grp` is a data matrix containing clinical information for 547 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
-
+`e` is a data matrix containing clinical information for 547 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
 
 ```{r}
 load("~/projects/ector/data/ector_clinicals.RData")
-exp_grp = ector_clinicals
-head(exp_grp[,1:4])
-dim(exp_grp)
+e = ector_clinicals
+head(e[,1:4])
+dim(e)
 ```
  
  
@@ -57,36 +55,7 @@ dim(d)
 ```
 
 
-`genes` is a data matrix containing the informations for each tissue-restricted gene (3.433 genes in total). The rows correspond to genes while the columns correspond to their related informations.
-
-```{r}
-load("~/projects/ector/data/ector_tissue_specific_genes.RData")
-genes = ector_tissue_specific_genes
-head(genes[,1:4])
-dim(genes)
-```
- 
- 
- 
-## Data filtering
-
-Elimination of samples in `exp_grp` which are missing in `d`:
-Since not all the samples from `exp_grp` are found in `d`, the first step is to eliminate in `exp_grp` the clinical informations of samples which do not appear in `d`.
-`tmp_idx` is a list of characters representing the samples ID found both in `d` and `exp_grp`.
-`e` represents the data matrix `exp_grp` without the samples missing in `d`, containing then the informations for 499 samples (41 normal and 458 tumorous samples).
-
-```{r}
-rownames(exp_grp) = exp_grp$id_sample
-tmp_idx = intersect(colnames(d), rownames(exp_grp))
-e = exp_grp[tmp_idx,]                               
-head(e[,1:4])
-dim(e)
-```
-
-
-Organization of `e`:
 `idx_n` indicates the ID of normal samples and `idx_c` indicates the ID of cancerous samples.
-
 
 ```{r}
 idx_n = rownames(e)[e$tissue_status %in% "normal"]  
@@ -95,23 +64,8 @@ length(idx_n)
 idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
 head(idx_c)
 length(idx_c)
-```
-
-
-Elimination of non tissue-restricted genes in `d`:
-`genes_idx` is a list of characters representing the gene symbols found both in `genes` and `d`.
-`d` now contains the RNAseq counts for tissue-restricted genes only for each of the 499 samples. `d` is thus now made of 1297 rows.
-
-
-```{r}
-genes_idx = intersect(rownames(d), genes$gene_symbol)
-head(genes_idx)
-length(genes)
-d = d[genes_idx,]
-head(d[,1:4])
-dim(d)
-```
-
+``` 
+ 
 
 
 # Method
@@ -141,7 +95,7 @@ The plot contains also the lines corresponding to the mean and the threshold (m3
 
 
 ```{r}
-plot_gene_expr = function(gs, d, idx_n, e, thresh_func=m3sd) {
+plot_gene_expr = function(gs, d, idx_n, thresh_func=m3sd) {
   expr = d[gs,]
   plot(jitter(as.numeric(as.factor(e$tissue_status))), expr, 
   xlab=" ", ylab="Expression", xaxt = "n",
@@ -154,7 +108,6 @@ plot_gene_expr = function(gs, d, idx_n, e, thresh_func=m3sd) {
   abline(h=mean(expr[idx_n]), col="black")
   legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
 }
-
 
 ```
 
@@ -201,14 +154,23 @@ compute_cox_pv = function (x, idx_c, idx_n, e, thresh_func=m3sd) {
   v = x[idx_c]>thresh_func(x[idx_n])
   f = suppressWarnings(survival::coxph(ss ~ v))
   sf = summary(f)
-  pvcox = sf$logtest[3]
-  return(pvcox)
+  pvcox = signif(sf$wald["pvalue"], digits=3)
+  hr = signif(sf$coef[2], digits=3)
+  logrank = signif(sf$logtest["pvalue"], digits=3)
+  res = c(pvcox, hr, logrank)
+  return(res)
+  
 }
 
-pvs = sort(apply(d[candidates,], 1, compute_cox_pv, idx_c, idx_n, e))
-biomarkers = names(pvs)[pvs<=0.05]
-biomarkers
+pvs = apply(d[candidates,], 1, compute_cox_pv, idx_c, idx_n, e)
+head(pvs)
 
+pvcox = pvs[1,]
+biomarkers = names(pvcox)[pvcox<0.05]
+pvs_biomarkers = apply(d[biomarkers,], 1, compute_cox_pv, idx_c, idx_n, e)
+hr = pvs_biomarkers[2,]
+biomarkers = names(hr)[hr>1]
+logrank = pvs[3,]
 
 ```
 
@@ -219,10 +181,10 @@ As for p-values, the function drawing survival curves (`plot_survival`) requires
 
 
 ```{r}
+
 plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=m3sd) {
   expr = d[gs,]
   pv = compute_cox_pv(expr, idx_c, idx_n, e, thresh_func=m3sd)
-  
   ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
   v = expr[idx_c]>thresh_func(expr[idx_n])
   sf = survival::survfit(ss ~ v)
@@ -230,18 +192,29 @@ plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=m3sd) {
     sf, 
     xlab="Time in months", 
     ylab="Overall survival", 
-    main=paste0(gs, " pv_cox=", signif(pv, 3)),
+    main=paste0(gs, " pv_cox=", signif(pvcox[gs], 3),
+                "\n pv_logrank=", signif(logrank[gs],3),
+                "\n HR=", signif(hr[gs],3)),
     col=c(4,2)
   )
-  legend("topright", c("Off", "On"), lty=1, col=c(4,2))
+  legend("topright",
+        c(paste0("Off (n=", sum(expr[idx_c]<=thresh_func(expr[idx_n])), ")"),
+        paste0("On (n=", sum(expr[idx_c]>thresh_func(expr[idx_n])), ")")),
+  lty=1, col=c(4,2))
 }
 
-layout(matrix(1:2,1), respect=TRUE)
-graphs = sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
+plot_survival(gs=rownames(d)[1], d, idx_c, idx_n, e, thresh_func=m3sd)
+
+sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
 ```
 
 
+# Biomarkers
 
+```{r}
+ector_biomarkers = biomarkers
+save(ector_biomarkers, file='~/projects/ector/data/ector_biomarkers.RData' , compress='xz')
+```
 
 
 # Material and methods
