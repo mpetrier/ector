@@ -1,0 +1,119 @@
+---
+title: "`ector`: Ectopic gene expression using R"
+subtitle: "TCGA-COAD case study - Combination step"
+author: "Mélanie Petrier, Ekaterina Flin, Florent Chuffart, Sophie Rousseaux"
+contact: 
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+```{r echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=TRUE, results="verbatim", dpi=75)
+```
+
+
+# Loading data and function
+
+```{r}
+load("~/projects/ector/data/ector_clinicals.RData")
+load("~/projects/ector/data/ector_transcriptome.RData")
+load("~/projects/ector/data/ector_biomarkers.RData")
+e = ector_clinicals
+d = ector_transcriptome
+biomarkers = ector_biomarkers
+
+idx_n = rownames(e)[e$tissue_status %in% "normal"]  
+head(idx_n)
+length(idx_n)
+idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
+head(idx_c)
+length(idx_c)
+
+m3sd =  function(x) {
+  mean(x)+(3*sd(x))
+}
+```
+
+
+# Patients grouping
+
+```{r}
+thresh_biomarkers = apply(d[biomarkers,idx_n], 1, m3sd)
+number_genes = apply(d[biomarkers,idx_c]>thresh_biomarkers, 2, function(x){sum(x)})
+group = rep(1,length(number_genes))
+patients_group = cbind(number_genes,group)
+colnames(patients_group)=c("number_genes", "group")
+
+for (i in 1:length(patients_group[,1])) {
+    if (patients_group[i,1]>5) {
+      patients_group[i,2]=3
+    } else if (patients_group[i,1]>2) {
+      patients_group[i,2]=2
+    } else {
+      patients_group[i,2]=1
+    }
+}
+
+table(patients_group[,2])
+```
+
+
+# Survival
+
+## p-values
+
+```{r}
+
+  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+  v = patients_group[,1]
+  f = suppressWarnings(survival::coxph(ss ~ v))
+  sf = summary(f)
+  pvcox = signif(sf$wald["pvalue"], digits=3)
+  hr = signif(sf$coef[2], digits=3)
+  logrank = signif(sf$logtest["pvalue"], digits=3)
+  res = c(pvcox, hr, logrank)
+  res
+
+```
+
+
+## Curve
+
+```{r}
+
+  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+  v =  patients_group[,2]
+  sf = survival::survfit(ss ~ v)
+  plot(
+    sf, 
+    xlab="Time in months",
+    xlim=c(0,120),
+    ylab="Overall survival", 
+    main=paste0(" pv_cox=", signif(pvcox, 3),
+                "\n pv_logrank=", signif(logrank,3),
+                "\n HR=", signif(hr,3)),
+    col=c("blue","red","black")
+  )
+  legend("topright",
+      c(paste0("P1 (n=", sum(patients_group[,2]==1), ")"),
+        paste0("P2 (n=", sum(patients_group[,2]==2), ")"),
+        paste0("P3 (n=", sum(patients_group[,2]==3), ")")),
+      lty=1, col=c("blue","red","black"))
+
+```
+
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
