@@ -32,7 +32,7 @@ dim(genes)
 #' Update vector of genes using epimed API
 #'
 #' This function updates vector of genes using epimed API
-#' @param genes_to_update a vector of genes to be updated
+#' @param genes_to_position a vector of genes to position
 #' @param jobid the id of the job if job exists
 #' @param taxid the name of the taxonomy to refer (9606 for homo spaiens, 10090 for mus musculus)
 #' @param assembly the name of the assembly to refer
@@ -71,41 +71,82 @@ epimed_api_position = function(genes_to_position, jobid, assembly="GRCh38", taxi
 bed_genes = epimed_api_position(genes$entrez, jobid="20200120165632730R975")
 head(bed_genes)
 dim(bed_genes)
-ector_tissue_specific_genes = bed_genes[,1:7]
-save(ector_tissue_specific_genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
+genes = bed_genes[,1:7]
+save(genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
 ```
 
 
-`restricted_genes` is a data.frame describing tissue-restricted genes (`r nrow(genes)` genes in total). 
+`genes` is a data.frame describing tissue-restricted genes (`r nrow(genes)` genes in total). 
 The rows correspond to genes while the columns correspond to their related informations.
 
 
-
 # Clinicals
-
-`exp_grp` is a data matrix containing clinical information for 547 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
 
 
 ```{r}
 exp_grp = epimedtools::get_tcga_exp_grp(tcga_project="TCGA-COAD")
 head(exp_grp[,1:4])
 dim(exp_grp)
-ector_clinicals  = exp_grp
-save(ector_clinicals, file='~/projects/ector/data/ector_clinicals.RData' , compress='xz')
 ```
+
+`exp_grp` is a data matrix containing clinical information for `r nrow(exp_grp)` samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
+
 
 # Transcriptomic data
 
-`d`  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
 
 ```{r}
 s = readRDS("~/projects/tcga_studies/study_TCGA-COAD_trscr.rds")
 d = s$data
 head(d[,1:4])
 dim(d)
+```
+
+`d`  is a data matrix containing the RNAseq counts of `r nrow(d)` genes for `r ncol(d)` samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
+
+
+# Data filtering
+
+
+Elimination of samples from `exp_grp` missing in `d`:
+
+
+```{r}
+rownames(exp_grp) = exp_grp$id_sample
+tmp_idx = intersect(colnames(d), rownames(exp_grp))
+e = exp_grp[tmp_idx,]                               
+head(e[,1:4])
+dim(e)
+ector_clinicals = e
+save(ector_clinicals, file='~/projects/ector/data/ector_clinicals.RData' , compress='xz')
+
+idx_n = rownames(e)[e$tissue_status %in% "normal"]  
+idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
+
+```
+
+Since not all the samples from `exp_grp` are found in `d`, the first step is to eliminate in `exp_grp` the clinical informations of samples which do not appear in `d`.
+`tmp_idx` is a list of characters representing the samples ID found both in `d` and `exp_grp`.
+`e` represents the data matrix `exp_grp` without the samples missing in `d`, containing then the informations for `r nrow(e)` samples (`r length(idx_n)` normal and `r length(idx_c)` tumorous samples).
+
+
+Elimination of non tissue-restricted genes in `d`:
+
+
+```{r}
+genes_idx = intersect(rownames(d), genes$gene_symbol)
+head(genes_idx)
+length(genes)
+d = d[genes_idx,]
+head(d[,1:4])
+dim(d)
 ector_transcriptome = d
 save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData' , compress='xz')
 ```
+
+`genes_idx` is a list of characters representing the gene symbols found both in `genes` and `d`.
+`d` now contains the RNAseq counts for `r nrow(d)` tissue-restricted genes, for each of the `r ncol(d)` samples.
+
 
 # Checking data
 
@@ -113,11 +154,11 @@ save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData'
 ```{r}
 # d is matrix
 # e is df
-# g is df
-# g is ordered by chr and position
-# g is bed inspired
+# genes is df
+# genes is ordered by chr and position
+# genes is bed inspired
 # rownames(e) == colnames(d)
-# rownames(g) == rownames(d)
+# rownames(genes) == rownames(d)
 ```
 
 # Session Information
