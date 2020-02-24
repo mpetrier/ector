@@ -71,12 +71,12 @@ epimed_api_position = function(genes_to_position, jobid, assembly="GRCh38", taxi
 bed_genes = epimed_api_position(genes$entrez, jobid="20200120165632730R975")
 head(bed_genes)
 dim(bed_genes)
-genes = bed_genes[,1:7]
-save(genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
+ector_tissue_specific_genes = bed_genes[,1:7]
+save(ector_tissue_specific_genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
 ```
 
 
-`genes` is a data.frame describing tissue-restricted genes (`r nrow(genes)` genes in total). 
+`ector_tissue_specific_genes` is a dataframe describing tissue-restricted genes (`r nrow(ector_tissue_specific_genes)` genes in total). More precisely, it contains the testis-, placenta-, ESC- and brain-restricted genes.
 The rows correspond to genes while the columns correspond to their related informations.
 
 
@@ -120,8 +120,10 @@ dim(e)
 ector_clinicals = e
 save(ector_clinicals, file='~/projects/ector/data/ector_clinicals.RData' , compress='xz')
 
-idx_n = rownames(e)[e$tissue_status %in% "normal"]  
+idx_n = rownames(e)[e$tissue_status %in% "normal"] 
+length(idx_n)
 idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
+length(idx_c)
 
 ```
 
@@ -134,6 +136,7 @@ Elimination of non tissue-restricted genes in `d`:
 
 
 ```{r}
+genes = ector_tissue_specific_genes
 genes_idx = intersect(rownames(d), genes$gene_symbol)
 head(genes_idx)
 length(genes)
@@ -144,7 +147,7 @@ ector_transcriptome = d
 save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData' , compress='xz')
 ```
 
-`genes_idx` is a list of characters representing the gene symbols found both in `genes` and `d`.
+`genes_idx` is a list of characters representing the gene symbols found both in `ector_tissue_specific_genes` and `d`.
 `d` now contains the RNAseq counts for `r nrow(d)` tissue-restricted genes, for each of the `r ncol(d)` samples.
 
 
