@@ -40,7 +40,7 @@ Data loaded below have been filtered in a previous vignette (00_vignette_data).
 ```{r}
 load("~/projects/ector/data/ector_clinicals.RData")
 e = ector_clinicals
-head(e[,1:4])
+head(e)
 dim(e)
 
 idx_n = rownames(e)[e$tissue_status %in% "normal"]  

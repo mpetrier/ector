@@ -72,7 +72,12 @@ bed_genes = epimed_api_position(genes$entrez, jobid="20200120165632730R975")
 head(bed_genes)
 dim(bed_genes)
 ector_tissue_specific_genes = bed_genes[,1:7]
-save(ector_tissue_specific_genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
+ector_tissue_specific_genes = ector_tissue_specific_genes[!is.na(ector_tissue_specific_genes[,1]) & !is.na(ector_tissue_specific_genes[,2]) & !is.na(ector_tissue_specific_genes[,3]) & ector_tissue_specific_genes[,1] != "",]
+ector_tissue_specific_genes = ector_tissue_specific_genes[order(as.numeric(substr(ector_tissue_specific_genes[,1], 4,10))),]
+ector_tissue_specific_genes[,1] = factor(ector_tissue_specific_genes[,1], levels=unique(ector_tissue_specific_genes[,1]))
+ector_tissue_specific_genes = ector_tissue_specific_genes[order(ector_tissue_specific_genes[,1], ector_tissue_specific_genes[,2]),]
+ector_tissue_specific_genes  = ector_tissue_specific_genes[!duplicated(ector_tissue_specific_genes$gene_symbol),]
+rownames(ector_tissue_specific_genes) = ector_tissue_specific_genes$gene_symbol
 ```
 
 
@@ -117,8 +122,7 @@ tmp_idx = intersect(colnames(d), rownames(exp_grp))
 e = exp_grp[tmp_idx,]                               
 head(e[,1:4])
 dim(e)
-ector_clinicals = e
-save(ector_clinicals, file='~/projects/ector/data/ector_clinicals.RData' , compress='xz')
+ector_clinicals = e[,c("tissue_status", "os_months", "os_censor")]
 
 idx_n = rownames(e)[e$tissue_status %in% "normal"] 
 length(idx_n)
@@ -137,14 +141,14 @@ Elimination of non tissue-restricted genes in `d`:
 
 ```{r}
 genes = ector_tissue_specific_genes
-genes_idx = intersect(rownames(d), genes$gene_symbol)
+genes_idx = intersect(rownames(genes), rownames(d))
 head(genes_idx)
 length(genes)
 d = d[genes_idx,]
+ector_tissue_specific_genes = ector_tissue_specific_genes[genes_idx,]
 head(d[,1:4])
 dim(d)
 ector_transcriptome = d
-save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData' , compress='xz')
 ```
 
 `genes_idx` is a list of characters representing the gene symbols found both in `ector_tissue_specific_genes` and `d`.
@@ -155,13 +159,44 @@ save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData'
 
 
 ```{r}
+
+
 # d is matrix
+is.matrix(ector_transcriptome)
 # e is df
+is.data.frame(ector_clinicals)
 # genes is df
-# genes is ordered by chr and position
+is.data.frame(ector_tissue_specific_genes)
+
 # genes is bed inspired
+is.character(ector_tissue_specific_genes[,1])
+is.numeric(ector_tissue_specific_genes[,2])
+is.numeric(ector_tissue_specific_genes[,3])
+sum(ector_tissue_specific_genes[,3] < ector_tissue_specific_genes[,2]) == 0 
+sum(!ector_tissue_specific_genes[,6] %in% c("+", "-", ".")) == 0 
+# genes is ordered by chr and position
+!is.unsorted(ector_tissue_specific_genes[,1])
+sapply(unique(ector_tissue_specific_genes[,1]), function(chr) {
+  !is.unsorted(ector_tissue_specific_genes[ector_tissue_specific_genes[,1] %in% chr,2])  
+})
 # rownames(e) == colnames(d)
+sum(rownames(ector_clinicals) != colnames(ector_transcriptome)) == 0
 # rownames(genes) == rownames(d)
+sum(rownames(ector_tissue_specific_genes) != rownames(ector_transcriptome)) == 0 
+
+
+dim(ector_transcriptome)
+dim(ector_clinicals)
+dim(ector_tissue_specific_genes)
+
+head(ector_transcriptome)         [,1:6]
+head(ector_clinicals)             
+head(ector_tissue_specific_genes) [,1:6]
+
+
+save(ector_transcriptome, file='~/projects/ector/data/ector_transcriptome.RData' , compress='xz')
+save(ector_clinicals, file='~/projects/ector/data/ector_clinicals.RData' , compress='xz')
+save(ector_tissue_specific_genes, file='~/projects/ector/data/ector_tissue_specific_genes.RData' , compress='xz')
 ```
 
 # Session Information
