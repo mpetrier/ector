@@ -1,0 +1,22 @@
+Package: ector
+Type: Package
+Title: Ectopic gene expression in cancer
+Description: An R package that detects ectopic gene expression in cancer.
+Version: 0.0.0.9000
+Date: 2020-02-24
+Authors@R: c(
+    person("Florent", "Chuffart", ,"florent.chuffart@gmail.com", c("aut", "cre", "cph")),
+    person("Melanie", "Petrier", ,"melanie.petrier@gmail.com", c("aut")),
+    person("Ekaterina", "Flin", ,"ekaterina.flin@univ-grenoble-alpes.fr", c("aut")),
+    person("Sophie", "Rousseaux", ,"sophie.rousseaux@univ-grenoble-alpes.fr", c("aut"))
+    )
+Maintainer: Florent Chuffart <florent.chuffart@gmail.com>
+License: GPL
+LazyData: TRUE
+Imports:
+    survival
+RoxygenNote: 6.1.1
+Suggests: knitr,
+    rmarkdown,
+    testthat
+VignetteBuilder: knitr

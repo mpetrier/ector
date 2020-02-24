@@ -2,10 +2,10 @@
 An R package that detects ectopic gene expression in cancer
 
 
-# Installation
+## Installation
 
 
-## From github
+### From github
 
 ```R
 # install.packages("devtools")
@@ -13,7 +13,7 @@ devtools::install_github("mpetrier/ector")
 ```
 
 
-## From sources
+### From sources
 
 ### Get sources
 
@@ -26,14 +26,14 @@ R
 ```
 
 
-### Build package
+#### Build package
 
 ```R
 # install.packages("devtools")
 devtools::load_all(); devtools::document(); devtools::install(); devtools::check()
 ```
 
-### Example
+#### Example
 
 ```R
 rmarkdown::render("vignettes/vignette_ector.Rmd")
