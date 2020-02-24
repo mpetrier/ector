@@ -155,7 +155,7 @@ length(candidates)
 
 
 
-## Survival
+## Univariate Survival
 
 ### p-values
 
@@ -262,9 +262,9 @@ table(patients_group[,2])
 
 `number_genes` gives for each patient the number of biomarkers that are ectopically express. It ranges from 0 to 13, meaning that some patients 
 
-# Survival
+## Survival P1 P2 P3
 
-## p-values
+### p-values
 
 ```{r}
 
@@ -281,33 +281,29 @@ table(patients_group[,2])
 ```
 
 
-## Curve
+### Curve
 
 ```{r}
-<<<<<<< HEAD
-ector_biomarkers = biomarkers
-=======
 
-  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-  v =  patients_group[,2]
-  sf = survival::survfit(ss ~ v)
-  plot(
-    sf, 
-    xlab="Time in months",
-    xlim=c(0,80),
-    ylab="Overall survival", 
-    main=paste0(" pv_cox=", signif(pvcox, 3),
-                "\n pv_logrank=", signif(logrank,3),
-                "\n HR=", signif(hr,3)),
-    col=c("blue","red","black")
-  )
-  legend("topright",
-      c(paste0("P1 (n=", sum(patients_group[,2]==1), ")"),
-        paste0("P2 (n=", sum(patients_group[,2]==2), ")"),
-        paste0("P3 (n=", sum(patients_group[,2]==3), ")")),
-      lty=1, col=c("blue","red","black"))
+ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+v =  patients_group[,2]
+sf = survival::survfit(ss ~ v)
+plot(
+  sf, 
+  xlab="Time in months",
+  xlim=c(0,80),
+  ylab="Overall survival", 
+  main=paste0(" pv_cox=", signif(pvcox, 3),
+              "\n pv_logrank=", signif(logrank,3),
+              "\n HR=", signif(hr,3)),
+  col=c("blue","red","black")
+)
+legend("topright",
+    c(paste0("P1 (n=", sum(patients_group[,2]==1), ")"),
+      paste0("P2 (n=", sum(patients_group[,2]==2), ")"),
+      paste0("P3 (n=", sum(patients_group[,2]==3), ")")),
+    lty=1, col=c("blue","red","black"))
 
->>>>>>> c8ae9403227ed6ccf7a3f7e86cfe55f138722aea
 ```
 
 
