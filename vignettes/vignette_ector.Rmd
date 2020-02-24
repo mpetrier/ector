@@ -12,6 +12,7 @@ output:
     number_sections: true
 vignette: >
   %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Ectopic gene expression using R}
   \usepackage[utf8]{inputenc}
 ---
 

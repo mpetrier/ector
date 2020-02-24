@@ -29,13 +29,12 @@ R
 ### Build package
 
 ```R
-install.packages("devtools")
-devtools::load_all(); devtools::document(); devtools::install(); devtools::check(build_args="--no-build-vignettes")
+# install.packages("devtools")
+devtools::load_all(); devtools::document(); devtools::install(); devtools::check()
 ```
 
 ### Example
 
 ```R
-setwd("vignettes")
-rmarkdown::render("vignette_ector.Rmd")
+rmarkdown::render("vignettes/vignette_ector.Rmd")
 ```
