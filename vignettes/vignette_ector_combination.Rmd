@@ -25,7 +25,6 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 ```{r}
 load("~/projects/ector/data/ector_clinicals.RData")
 load("~/projects/ector/data/ector_transcriptome.RData")
-load("~/projects/ector/data/ector_biomarkers.RData")
 e = ector_clinicals
 d = ector_transcriptome
 biomarkers = ector_biomarkers

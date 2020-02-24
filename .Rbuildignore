@@ -1,0 +1,5 @@
+vignettes/00_vignette_data.Rmd 
+vignettes/*.html
+^\.travis\.yml$
+LICENSE
+misc

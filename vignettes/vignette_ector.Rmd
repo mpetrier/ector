@@ -213,7 +213,6 @@ sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
 
 ```{r}
 ector_biomarkers = biomarkers
-save(ector_biomarkers, file='~/projects/ector/data/ector_biomarkers.RData' , compress='xz')
 ```
 
 
