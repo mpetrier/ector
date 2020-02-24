@@ -21,8 +21,6 @@ knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, 
 
 
 
-
-
 # Introduction
 
 ECTOR is a R package that detects ectopic gene expression in cancer, according to a threshold determined from normal samples. 
@@ -34,18 +32,29 @@ ECTOR analyses then the impact of abnormal expression of these genes in patient 
 
 
 The illustration of the method required the import of transcriptomic data (RNAseq) of 25.360 genes for 499 samples and clinical data (experimental grouping) of 547 samples from the TCGA study of colon adenocarcinoma. The list of tissue-restricted genes (testis, placenta, embryonic stem cells and brain) has also been imported from the Epimed database.
+Data loaded below have been filtered in a previous vignette (00_vignette_data).
 
-`e` is a data matrix containing clinical information for 547 samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample).
+
 
 ```{r}
 load("~/projects/ector/data/ector_clinicals.RData")
 e = ector_clinicals
 head(e[,1:4])
 dim(e)
+
+idx_n = rownames(e)[e$tissue_status %in% "normal"]  
+head(idx_n)
+length(idx_n)
+idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
+head(idx_c)
+length(idx_c)
 ```
  
+
+`e` is a data matrix containing clinical information for `r nrow(e)` samples. The columns represent these clinical characteristics and each row corresponds to one patient, whose ID is given in the first column (id_sample). 
+
+`idx_n` indicates the ID of normal samples and `idx_c` indicates the ID of cancerous samples.
  
-`d`  is a data matrix containing the RNAseq counts of each gene for 41 control samples and 458 tumorous samples, meaning 499 samples in total. It has been obtain from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
 
 ```{r}
 load("~/projects/ector/data/ector_transcriptome.RData")
@@ -55,25 +64,17 @@ dim(d)
 ```
 
 
-`idx_n` indicates the ID of normal samples and `idx_c` indicates the ID of cancerous samples.
+`d`  is a data matrix containing the RNAseq counts of each gene for `r length(idx_n)` control samples and `r length(idx_c)` tumoral samples, meaning `r ncol(d)` samples in total. It has been obtained from the TCGA study of colon adenocarcinoma (`s$data`). The rownames and colnames represent respectively the gene symbols and sample ID.
 
-```{r}
-idx_n = rownames(e)[e$tissue_status %in% "normal"]  
-head(idx_n)
-length(idx_n)
-idx_c = rownames(e)[e$tissue_status %in% "tumoral"]
-head(idx_c)
-length(idx_c)
-``` 
- 
 
 
 # Method
 
 ## Establishment of gene expression threshold
 
+
 In order to know if genes are abnormally expressed in cancerous samples, it is required to establish a threshold from normal samples for all genes. The formula commonly used is mean(x) + 3*sd(x), x being the expression of a given gene in normal samples.
-`m3sd` is the function used to determine the threshold for each gene and uses only data from normal samples (`idx_n`). The function is then applied for each gene in the data matrix `d`.
+
 
 ```{r}
 m3sd = function(x) {
@@ -86,16 +87,18 @@ length(thresh)
 ```
 
 
+`m3sd` is the function used to determine the threshold for each gene and uses only data from normal samples (`idx_n`). The function is then applied for each gene in the data matrix `d`.
+
+
 
 ## Plotting gene expression
 
+
 It is possible to visualize approximately the number of samples where a given gene is abnormally expressed.
-`figure` is a function to draw a plot where each sample is represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
-The plot contains also the lines corresponding to the mean and the threshold (m3sd) of the given gene and the dots found above the threshold are colored in red.
 
 
 ```{r}
-plot_gene_expr = function(gs, d, idx_n, thresh_func=m3sd) {
+plot_gene_expr = function(gs, d, idx_n, e, thresh_func=m3sd) {
   expr = d[gs,]
   plot(jitter(as.numeric(as.factor(e$tissue_status))), expr, 
   xlab=" ", ylab="Expression", xaxt = "n",
@@ -109,15 +112,21 @@ plot_gene_expr = function(gs, d, idx_n, thresh_func=m3sd) {
   legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
 }
 
+plot_gene_expr(gs=rownames(d)[1], d, idx_n, e, thresh_func=m3sd)
 ```
+
+
+`plot_gene_expr` is a function to draw a plot in which the samples are represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
+The plot contains also the lines corresponding to the mean and the threshold (m3sd) of the given gene and the dots found above the threshold are colored in red.
+
+The last line of the code above illustrates how to obtain this figure for the first gene of `d`.
 
 
 
 ## Determination of ectopically expressed genes
 
+
 In order to know if a gene is ectopically expressed in cancerous samples, it is required to compare their expression with the corresponding threshold.
-`prop_aberrant_expr` is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
-`candidates` indicates the gene symbols that have an aberrant expression in at least 10% of patients. 
 
 
 ```{r}
@@ -135,17 +144,23 @@ head(ectopic_activation)
 length(ectopic_activation)
 candidates = names(ectopic_activation)[ectopic_activation>0.1]
 length(candidates)
-
 ```
+
+
+`prop_ectopic_expr` is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
+
+`ectopic_activation` is used to apply the `prop_ectopic_expr` function to each gene.
+
+`candidates` indicates the gene symbols having an aberrant expression in at least 10% of patients.
+
 
 
 ## Survival
 
 ### p-values
 
+
 The influence of ectopic gene expression on patient survival is determined by the calculation of cox p-values by using the function `compute_cox_pv`.
-`pvs` allows to apply this function to every candidate gene.
-`biomarkers` gives the gene symbol for each gene whose cox p-value is less than 0.05.
 
 
 ```{r}
@@ -171,13 +186,19 @@ pvs_biomarkers = apply(d[biomarkers,], 1, compute_cox_pv, idx_c, idx_n, e)
 hr = pvs_biomarkers[2,]
 biomarkers = names(hr)[hr>1]
 logrank = pvs[3,]
-
 ```
+
+
+`pvs` allows to apply this function to every candidate gene.
+
+`biomarkers` gives the gene symbol for each gene whose cox p-value is less than 0.05 and whose hazard ratio is more than 1.
+
 
 
 ### Curves
 
-As for p-values, the function drawing survival curves (`plot_survival`) requires time and censor of survival. Patients are divided in two groups, depending on the activation status of a given gene (on or off). `plot_survival` is then applied to the previously determined `biomarkers`.
+
+As for the calculation of p-values, the function drawing survival curves (`plot_survival`) requires time and censor of survival. Patients are divided in two groups, depending on the activation status of a given gene (on or off).`plot_survival` is then applied to the previously determined `biomarkers`.
 
 
 ```{r}
@@ -190,7 +211,8 @@ plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=m3sd) {
   sf = survival::survfit(ss ~ v)
   plot(
     sf, 
-    xlab="Time in months", 
+    xlab="Time in months",
+    xlim=c(0,80),
     ylab="Overall survival", 
     main=paste0(gs, " pv_cox=", signif(pvcox[gs], 3),
                 "\n pv_logrank=", signif(logrank[gs],3),
@@ -203,18 +225,87 @@ plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=m3sd) {
   lty=1, col=c(4,2))
 }
 
-plot_survival(gs=rownames(d)[1], d, idx_c, idx_n, e, thresh_func=m3sd)
-
 sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
 ```
 
 
-# Biomarkers
+
+## Patients grouping
+
+
+The next step consists in grouping the patients depending on the number of `biomarkers` ectopically expressed.
+
 
 ```{r}
-ector_biomarkers = biomarkers
-save(ector_biomarkers, file='~/projects/ector/data/ector_biomarkers.RData' , compress='xz')
+thresh_biomarkers = apply(d[biomarkers,idx_n], 1, m3sd)
+number_genes = apply(d[biomarkers,idx_c]>thresh_biomarkers, 2, function(x){sum(x)})
+table(number_genes)
+group = rep(1,length(number_genes))
+patients_group = cbind(number_genes,group)
+head(patients_group)
+colnames(patients_group)=c("number_genes", "group")
+
+for (i in 1:length(patients_group[,1])) {
+    if (patients_group[i,1]>5) {
+      patients_group[i,2]=3
+    } else if (patients_group[i,1]>2) {
+      patients_group[i,2]=2
+    } else {
+      patients_group[i,2]=1
+    }
+}
+
+table(patients_group[,2])
 ```
+
+
+
+`number_genes` gives for each patient the number of biomarkers that are ectopically express. It ranges from 0 to 13, meaning that some patients 
+
+# Survival
+
+## p-values
+
+```{r}
+
+  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+  v = patients_group[,1]
+  f = suppressWarnings(survival::coxph(ss ~ v))
+  sf = summary(f)
+  pvcox = signif(sf$wald["pvalue"], digits=3)
+  hr = signif(sf$coef[2], digits=3)
+  logrank = signif(sf$logtest["pvalue"], digits=3)
+  res = c(pvcox, hr, logrank)
+  res
+
+```
+
+
+## Curve
+
+```{r}
+
+  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+  v =  patients_group[,2]
+  sf = survival::survfit(ss ~ v)
+  plot(
+    sf, 
+    xlab="Time in months",
+    xlim=c(0,80),
+    ylab="Overall survival", 
+    main=paste0(" pv_cox=", signif(pvcox, 3),
+                "\n pv_logrank=", signif(logrank,3),
+                "\n HR=", signif(hr,3)),
+    col=c("blue","red","black")
+  )
+  legend("topright",
+      c(paste0("P1 (n=", sum(patients_group[,2]==1), ")"),
+        paste0("P2 (n=", sum(patients_group[,2]==2), ")"),
+        paste0("P3 (n=", sum(patients_group[,2]==3), ")")),
+      lty=1, col=c("blue","red","black"))
+
+```
+
 
 
 # Material and methods
