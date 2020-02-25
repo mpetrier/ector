@@ -4,9 +4,6 @@ An R package that detects ectopic gene expression in cancer
 
 ## Installation
 
-
-### From github
-
 ```R
 # install.packages("devtools")
 devtools::install_github("mpetrier/ector")
