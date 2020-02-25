@@ -10,7 +10,7 @@ devtools::install_github("mpetrier/ector")
 ```
 
 
-### From sources
+## Develpment
 
 ### Get sources
 
@@ -23,14 +23,14 @@ R
 ```
 
 
-#### Build package
+### Build package
 
 ```R
 # install.packages("devtools")
 devtools::load_all(); devtools::document(); devtools::install(); devtools::check()
 ```
 
-#### Example
+### Example
 
 ```R
 rmarkdown::render("vignettes/vignette_ector.Rmd")
