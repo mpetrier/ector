@@ -2,14 +2,9 @@
 title: "`ector`: Ectopic gene expression using R"
 subtitle: "TCGA-COAD case study"
 author: "Mélanie Petrier, Ekaterina Flin, Florent Chuffart, Sophie Rousseaux"
-contact: 
 date: "`r Sys.Date()`"
-output: 
-  rmarkdown::html_document:
-    toc: true
-    toc_float: true
-    toc_depth: 3
-    number_sections: true
+output:  
+  rmarkdown::html_vignette
 vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteIndexEntry{Ectopic gene expression using R}
