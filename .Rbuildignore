@@ -3,3 +3,5 @@ vignettes/*.html
 ^\.travis\.yml$
 LICENSE
 misc
+^.*\.Rproj$
+^\.Rproj\.user$
