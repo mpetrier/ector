@@ -33,8 +33,7 @@ Data loaded below have been filtered in a previous vignette (00_vignette_data).
 
 
 ```{r}
-load("~/projects/ector/data/ector_clinicals.RData")
-e = ector_clinicals
+e = ector::ector_clinicals
 head(e)
 dim(e)
 
@@ -53,8 +52,7 @@ length(idx_c)
  
 
 ```{r}
-load("~/projects/ector/data/ector_transcriptome.RData")
-d = ector_transcriptome
+d = ector::ector_transcriptome
 head(d[,1:4])
 dim(d)
 ```
@@ -72,14 +70,15 @@ dim(d)
 In order to know if genes are abnormally expressed in cancerous samples, it is required to establish a threshold from normal samples for all genes. The formula commonly used is mean(x) + 3*sd(x), x being the expression of a given gene in normal samples.
 
 
-```{r}
+
+`ector::m3sd` is the function used to determine the threshold for each gene and uses only data from normal samples (`idx_n`). The function is then applied for each gene in the data matrix `d`.
+
+```{r echo=FALSE}
 thresh = apply(d[,idx_n], 1, ector::m3sd)
 head(thresh)
 length(thresh)
 ```
 
-
-`ector::m3sd` is the function used to determine the threshold for each gene and uses only data from normal samples (`idx_n`). The function is then applied for each gene in the data matrix `d`.
 
 
 
@@ -88,8 +87,14 @@ length(thresh)
 
 It is possible to visualize approximately the number of samples where a given gene is abnormally expressed.
 
+`plot_gene_expr` is a function to draw a plot in which the samples are represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
+The plot contains also the lines corresponding to the mean and the threshold (`ector::m3sd`) of the given gene and the dots found above the threshold are colored in red.
 
-```{r}
+The last line of the code above illustrates how to obtain this figure for the first gene of `d`.
+
+
+
+```{r echo=FALSE}
 plot_gene_expr = function(gs, d, idx_n, e, thresh_func=ector::m3sd) {
   expr = d[gs,]
   plot(jitter(as.numeric(as.factor(e$tissue_status))), expr, 
@@ -104,14 +109,10 @@ plot_gene_expr = function(gs, d, idx_n, e, thresh_func=ector::m3sd) {
   legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
 }
 
+layout(1, respect=TRUE)
 plot_gene_expr(gs=rownames(d)[1], d, idx_n, e, thresh_func=ector::m3sd)
 ```
 
-
-`plot_gene_expr` is a function to draw a plot in which the samples are represented by a dot. The x axis is the tissue status (normal or tumoral) and the y axis represents the expression. 
-The plot contains also the lines corresponding to the mean and the threshold (`ector::m3sd`) of the given gene and the dots found above the threshold are colored in red.
-
-The last line of the code above illustrates how to obtain this figure for the first gene of `d`.
 
 
 
@@ -121,7 +122,14 @@ The last line of the code above illustrates how to obtain this figure for the fi
 In order to know if a gene is ectopically expressed in cancerous samples, it is required to compare their expression with the corresponding threshold.
 
 
-```{r}
+`prop_ectopic_expr` is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
+
+`ectopic_activation` is used to apply the `prop_ectopic_expr` function to each gene.
+
+`candidates` indicates the gene symbols having an aberrant expression in at least 10% of patients.
+
+
+```{r echo=FALSE}
 prop_ectopic_expr = function(x, idx_c, idx_n, thresh_func=ector::m3sd) {
   if (sum(is.na(x)) > 0) {
     warning("NA is expression values.")    
@@ -135,15 +143,12 @@ ectopic_activation = apply(d, 1, prop_ectopic_expr, idx_c, idx_n)
 head(ectopic_activation)
 length(ectopic_activation)
 candidates = names(ectopic_activation)[ectopic_activation>0.1]
+```
+
+```{r}
 length(candidates)
 ```
 
-
-`prop_ectopic_expr` is a function which aims to calculate the percentage of patients in which the expression of a given gene is aberrant (higher than the threshold).
-
-`ectopic_activation` is used to apply the `prop_ectopic_expr` function to each gene.
-
-`candidates` indicates the gene symbols having an aberrant expression in at least 10% of patients.
 
 
 
@@ -155,46 +160,52 @@ length(candidates)
 The influence of ectopic gene expression on patient survival is determined by the calculation of cox p-values by using the function `compute_cox_pv`.
 
 
-```{r}
+```{r echo=FALSE}
 compute_cox_pv = function (x, idx_c, idx_n, e, thresh_func=ector::m3sd) {
   ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
   v = x[idx_c]>thresh_func(x[idx_n])
   f = suppressWarnings(survival::coxph(ss ~ v))
   sf = summary(f)
-  pvcox = signif(sf$wald["pvalue"], digits=3)
+  pvcox = signif(sf$wald[["pvalue"]], digits=3)
   hr = signif(sf$coef[2], digits=3)
-  logrank = signif(sf$logtest["pvalue"], digits=3)
-  res = c(pvcox, hr, logrank)
+  logrank = signif(sf$logtest[["pvalue"]], digits=3)
+  res = c(pvcox=pvcox, hr=hr, logrank=logrank)
   return(res)
   
 }
-
-pvs = apply(d[candidates,], 1, compute_cox_pv, idx_c, idx_n, e)
-head(pvs)
-
-pvcox = pvs[1,]
-biomarkers = names(pvcox)[pvcox<0.05]
-pvs_biomarkers = apply(d[biomarkers,], 1, compute_cox_pv, idx_c, idx_n, e)
-hr = pvs_biomarkers[2,]
-biomarkers = names(hr)[hr>1]
-logrank = pvs[3,]
+cox_results = data.frame(t(apply(d[candidates,], 1, compute_cox_pv, idx_c, idx_n, e)))
+biomarkers = rownames(cox_results)[cox_results$pvcox<0.05 & cox_results$hr>1]
 ```
 
 
-`pvs` allows to apply this function to every candidate gene.
+`cox_results` allows to apply this function to every candidate gene.
+
+```{r}
+head(cox_results)
+dim(cox_results)
+```
 
 `biomarkers` gives the gene symbol for each gene whose cox p-value is less than 0.05 and whose hazard ratio is more than 1.
 
+
+```{r echo=FALSE}
+layout(matrix(1:2,1), respect=TRUE)
+plot(cox_results$hr, -log10(cox_results$pvcox), main="Volcano plot", col="grey")
+abline(h=-log10(0.05), lty=2, col=2)
+text(cox_results[biomarkers,]$hr, -log10(cox_results[biomarkers,]$pvcox), biomarkers, cex=.6)
+plot(-log10(cox_results$pvcox), main="Manhattan plot", col="grey")
+abline(h=-log10(0.05), lty=2, col=2)
+text(which(rownames(cox_results) %in% biomarkers), -log10(cox_results[biomarkers,]$pvcox), biomarkers, cex=.6)
+```
 
 
 ### Curves
 
 
-As for the calculation of p-values, the function drawing survival curves (`plot_survival`) requires time and censor of survival. Patients are divided in two groups, depending on the activation status of a given gene (on or off).`plot_survival` is then applied to the previously determined `biomarkers`.
+As for the calculation of p-values, the function drawing survival curves (`plot_survival`) requires time and censor of survival. Patients are divided in two groups, depending on the activation status of a given gene (on or off). `plot_survival` is then applied to the previously determined `biomarkers`.
 
 
-```{r}
-
+```{r echo=FALSE}
 plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=ector::m3sd) {
   expr = d[gs,]
   pv = compute_cox_pv(expr, idx_c, idx_n, e, thresh_func=thresh_func)
@@ -206,9 +217,9 @@ plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=ector::m3sd) {
     xlab="Time in months",
     xlim=c(0,80),
     ylab="Overall survival", 
-    main=paste0(gs, " pv_cox=", signif(pvcox[gs], 3),
-                "\n pv_logrank=", signif(logrank[gs],3),
-                "\n HR=", signif(hr[gs],3)),
+    main=paste0(gs, " pv_cox=", signif(cox_results[gs,]$pvcox, 3),
+                "\n pv_logrank=", signif(cox_results[gs,]$logrank,3),
+                "\n HR=", signif(cox_results[gs,]$hr,3)),
     col=c(4,2)
   )
   legend("topright",
@@ -217,7 +228,8 @@ plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=ector::m3sd) {
   lty=1, col=c(4,2))
 }
 
-sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
+layout(matrix(1:6,2), respect=TRUE)
+foo = sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
 ```
 
 
@@ -228,57 +240,47 @@ sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
 The next step consists in grouping the patients depending on the number of `biomarkers` ectopically expressed.
 
 
-```{r}
-thresh_biomarkers = apply(d[biomarkers,idx_n], 1, ector::m3sd)
-number_genes = apply(d[biomarkers,idx_c]>thresh_biomarkers, 2, function(x){sum(x)})
-table(number_genes)
-group = rep(1,length(number_genes))
-patients_group = cbind(number_genes,group)
-head(patients_group)
-colnames(patients_group)=c("number_genes", "group")
-
-for (i in 1:length(patients_group[,1])) {
-    if (patients_group[i,1]>5) {
-      patients_group[i,2]=3
-    } else if (patients_group[i,1]>2) {
-      patients_group[i,2]=2
-    } else {
-      patients_group[i,2]=1
-    }
-}
-
-table(patients_group[,2])
-```
-
-
 
 `number_genes` gives for each patient the number of biomarkers that are ectopically express. It ranges from 0 to 13, meaning that some patients 
 
-## Survival P1 P2 P3
+Thresholds to define P1 P2 P3 groups is obtained by... TODO
 
-### p-values
+
+```{r echo=FALSE}
+thresh_biomarkers = apply(d[biomarkers,idx_n], 1, ector::m3sd)
+number_genes = apply(d[biomarkers,idx_c]>thresh_biomarkers, 2, function(x){sum(x)})
+patients_group = data.frame(number_genes=number_genes, group="P1", stringsAsFactors=FALSE)
+patients_group[patients_group$number_genes>2,]$group = "P2"
+patients_group[patients_group$number_genes>5,]$group = "P3"
+```
 
 ```{r}
-
-  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-  v = patients_group[,1]
-  f = suppressWarnings(survival::coxph(ss ~ v))
-  sf = summary(f)
-  pvcox = signif(sf$wald["pvalue"], digits=3)
-  hr = signif(sf$coef[2], digits=3)
-  logrank = signif(sf$logtest["pvalue"], digits=3)
-  res = c(pvcox, hr, logrank)
-  res
-
+head(patients_group)
+table(patients_group$number_genes)
+table(patients_group$group)
 ```
 
 
-### Curve
 
-```{r}
 
+```{r echo=FALSE}
 ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-v =  patients_group[,2]
+v = patients_group$number_genes
+# v =  patients_group$group
+f = suppressWarnings(survival::coxph(ss ~ v))
+sf = summary(f)
+pvcox = signif(sf$wald[["pvalue"]], digits=3)
+hr = signif(sf$coef[2], digits=3)
+logrank = signif(sf$logtest[["pvalue"]], digits=3)
+res = c(pvcox=pvcox, hr=hr, logrank=logrank)
+# res
+```
+
+
+```{r echo=FALSE}
+layout(1, respect=TRUE)
+ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+v =  patients_group$group
 sf = survival::survfit(ss ~ v)
 plot(
   sf, 
@@ -291,9 +293,9 @@ plot(
   col=c("blue","red","black")
 )
 legend("topright",
-    c(paste0("P1 (n=", sum(patients_group[,2]==1), ")"),
-      paste0("P2 (n=", sum(patients_group[,2]==2), ")"),
-      paste0("P3 (n=", sum(patients_group[,2]==3), ")")),
+    c(paste0("P1 (n=", sum(patients_group[,2]=="P1"), ")"),
+      paste0("P2 (n=", sum(patients_group[,2]=="P2"), ")"),
+      paste0("P3 (n=", sum(patients_group[,2]=="P3"), ")")),
     lty=1, col=c("blue","red","black"))
 
 ```
