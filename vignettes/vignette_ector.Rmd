@@ -95,22 +95,23 @@ The last line of the code above illustrates how to obtain this figure for the fi
 
 
 ```{r echo=FALSE}
-plot_gene_expr = function(gs, d, idx_n, e, thresh_func=ector::m3sd) {
-  expr = d[gs,]
-  plot(jitter(as.numeric(as.factor(e$tissue_status))), expr, 
-  xlab=" ", ylab="Expression", xaxt = "n",
-       col = (expr>thresh_func(expr[idx_n]))+1, 
-       main=gs
-  )
-  tmp_tab = table(e$tissue_status)
-  axis(1, at = 1:2, paste0(names(tmp_tab)," (n=", tmp_tab, ")"), las = 1)
-  abline(h=thresh_func(expr[idx_n]), col="red")
-  abline(h=mean(expr[idx_n]), col="black")
-  legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
-}
+#plot_gene_expr = function(gs, d, e, idx_n, thresh_func=ector::m3sd) {
+#  expr = d[gs,]
+#  plot(jitter(as.numeric(as.factor(e$tissue_status))), expr, 
+#  xlab=" ", ylab="Expression", xaxt = "n",
+#       col = (expr>thresh_func(expr[idx_n]))+1, 
+#       main=gs
+#  )
+#  tmp_tab = table(e$tissue_status)
+#  axis(1, at = 1:2, paste0(names(tmp_tab)," (n=", tmp_tab, ")"), las = 1)
+#  abline(h=thresh_func(expr[idx_n]), col="red")
+#  abline(h=mean(expr[idx_n]), col="black")
+#  legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
+#}
 
 layout(1, respect=TRUE)
-plot_gene_expr(gs=rownames(d)[1], d, idx_n, e, thresh_func=ector::m3sd)
+ector::plot_gene_expr(gs=rownames(d)[1], d, e, idx_n, thresh_func=ector::m3sd)
+
 ```
 
 
@@ -130,22 +131,19 @@ In order to know if a gene is ectopically expressed in cancerous samples, it is 
 
 
 ```{r echo=FALSE}
-prop_ectopic_expr = function(x, idx_c, idx_n, thresh_func=ector::m3sd) {
-  if (sum(is.na(x)) > 0) {
-    warning("NA is expression values.")    
-  }
-  y = x[idx_c]>thresh_func(x[idx_n])
-  res = sum(y)/length(idx_c)
-  return(res)
-}
+#prop_ectopic_expr = function(x, idx_c, idx_n, thresh_func=ector::m3sd) {
+#  if (sum(is.na(x)) > 0) {
+#    warning("NA is expression values.")    
+#  }
+#  y = x[idx_c]>thresh_func(x[idx_n])
+#  res = sum(y)/length(idx_c)
+#  return(res)
+#}
 
-ectopic_activation = apply(d, 1, prop_ectopic_expr, idx_c, idx_n)
+ectopic_activation = apply(d, 1, ector::prop_ectopic_expr, idx_c, idx_n)
 head(ectopic_activation)
 length(ectopic_activation)
 candidates = names(ectopic_activation)[ectopic_activation>0.1]
-```
-
-```{r}
 length(candidates)
 ```
 
@@ -161,19 +159,19 @@ The influence of ectopic gene expression on patient survival is determined by th
 
 
 ```{r echo=FALSE}
-compute_cox_pv = function (x, idx_c, idx_n, e, thresh_func=ector::m3sd) {
-  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-  v = x[idx_c]>thresh_func(x[idx_n])
-  f = suppressWarnings(survival::coxph(ss ~ v))
-  sf = summary(f)
-  pvcox = signif(sf$wald[["pvalue"]], digits=3)
-  hr = signif(sf$coef[2], digits=3)
-  logrank = signif(sf$logtest[["pvalue"]], digits=3)
-  res = c(pvcox=pvcox, hr=hr, logrank=logrank)
-  return(res)
-  
-}
-cox_results = data.frame(t(apply(d[candidates,], 1, compute_cox_pv, idx_c, idx_n, e)))
+#compute_cox_pv = function (x, idx_c, idx_n, e, thresh_func=ector::m3sd) {
+#  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+#  v = x[idx_c]>thresh_func(x[idx_n])
+#  f = suppressWarnings(survival::coxph(ss ~ v))
+#  sf = summary(f)
+#  pvcox = signif(sf$wald[["pvalue"]], digits=3)
+#  hr = signif(sf$coef[2], digits=3)
+#  logrank = signif(sf$logtest[["pvalue"]], digits=3)
+#  res = c(pvcox=pvcox, hr=hr, logrank=logrank)
+#  return(res)
+#}
+
+cox_results = data.frame(t(apply(d[candidates,], 1, ector::compute_cox_pv, e, idx_c, idx_n,)))
 biomarkers = rownames(cox_results)[cox_results$pvcox<0.05 & cox_results$hr>1]
 ```
 
@@ -206,30 +204,31 @@ As for the calculation of p-values, the function drawing survival curves (`plot_
 
 
 ```{r echo=FALSE}
-plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=ector::m3sd) {
-  expr = d[gs,]
-  pv = compute_cox_pv(expr, idx_c, idx_n, e, thresh_func=thresh_func)
-  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-  v = expr[idx_c]>thresh_func(expr[idx_n])
-  sf = survival::survfit(ss ~ v)
-  plot(
-    sf, 
-    xlab="Time in months",
-    xlim=c(0,80),
-    ylab="Overall survival", 
-    main=paste0(gs, " pv_cox=", signif(cox_results[gs,]$pvcox, 3),
-                "\n pv_logrank=", signif(cox_results[gs,]$logrank,3),
-                "\n HR=", signif(cox_results[gs,]$hr,3)),
-    col=c(4,2)
-  )
-  legend("topright",
-        c(paste0("Off (n=", sum(expr[idx_c]<=thresh_func(expr[idx_n])), ")"),
-        paste0("On (n=", sum(expr[idx_c]>thresh_func(expr[idx_n])), ")")),
-  lty=1, col=c(4,2))
-}
+#plot_survival = function(gs, d, idx_c, idx_n, e, thresh_func=ector::m3sd) {
+#  expr = d[gs,]
+#  pv = compute_cox_pv(expr, e, idx_c, idx_n, thresh_func=thresh_func)
+#  ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+#  v = expr[idx_c]>thresh_func(expr[idx_n])
+#  sf = survival::survfit(ss ~ v)
+#  plot(
+#    sf, 
+#    xlab="Time in months",
+#    xlim=c(0,80),
+#    ylab="Overall survival", 
+#    main=paste0(gs, " pv_cox=", signif(cox_results[gs,]$pvcox, 3),
+#                "\n pv_logrank=", signif(cox_results[gs,]$logrank,3),
+#                "\n HR=", signif(cox_results[gs,]$hr,3)),
+#    col=c(4,2)
+#  )
+#  legend("topright",
+#        c(paste0("Off (n=", sum(expr[idx_c]<=thresh_func(expr[idx_n])), ")"),
+#        paste0("On (n=", sum(expr[idx_c]>thresh_func(expr[idx_n])), ")")),
+#  lty=1, col=c(4,2))
+#}
 
 layout(matrix(1:6,2), respect=TRUE)
-foo = sapply(biomarkers, plot_survival, d, idx_c, idx_n, e)
+foo = sapply(biomarkers, ector::plot_survival, d, e, idx_c, idx_n)
+
 ```
 
 
@@ -241,9 +240,9 @@ The next step consists in grouping the patients depending on the number of `biom
 
 
 
-`number_genes` gives for each patient the number of biomarkers that are ectopically express. It ranges from 0 to 13, meaning that some patients 
+`number_genes` gives for each patient the number of biomarkers that are ectopically expressed. It ranges from 0 to 13, meaning that some patients do not express any of these biomarkers ectopically while some others can express until 13 of them ectopically.  
 
-Thresholds to define P1 P2 P3 groups is obtained by... TODO
+The number of genes ectopically expressed allows to define the P1, P2 and P3 groups, in order to separate the patients. These groups are respectively composed of the patients expressing 0 to 2 genes, 3 to 5 genes and more than 5 genes ectopically.
 
 
 ```{r echo=FALSE}
@@ -264,40 +263,43 @@ table(patients_group$group)
 
 
 ```{r echo=FALSE}
-ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-v = patients_group$number_genes
+#ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+#v = patients_group$number_genes
 # v =  patients_group$group
-f = suppressWarnings(survival::coxph(ss ~ v))
-sf = summary(f)
-pvcox = signif(sf$wald[["pvalue"]], digits=3)
-hr = signif(sf$coef[2], digits=3)
-logrank = signif(sf$logtest[["pvalue"]], digits=3)
-res = c(pvcox=pvcox, hr=hr, logrank=logrank)
+#f = suppressWarnings(survival::coxph(ss ~ v))
+#sf = summary(f)
+#pvcox = signif(sf$wald[["pvalue"]], digits=3)
+#hr = signif(sf$coef[2], digits=3)
+#logrank = signif(sf$logtest[["pvalue"]], digits=3)
+#res = c(pvcox=pvcox, hr=hr, logrank=logrank)
 # res
+
+cox_results_grp = c(ector::compute_cox_pv_grp(e, idx_c, patients_group$number_genes))
 ```
 
 
 ```{r echo=FALSE}
 layout(1, respect=TRUE)
-ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-v =  patients_group$group
-sf = survival::survfit(ss ~ v)
-plot(
-  sf, 
-  xlab="Time in months",
-  xlim=c(0,80),
-  ylab="Overall survival", 
-  main=paste0(" pv_cox=", signif(pvcox, 3),
-              "\n pv_logrank=", signif(logrank,3),
-              "\n HR=", signif(hr,3)),
-  col=c("blue","red","black")
-)
-legend("topright",
-    c(paste0("P1 (n=", sum(patients_group[,2]=="P1"), ")"),
-      paste0("P2 (n=", sum(patients_group[,2]=="P2"), ")"),
-      paste0("P3 (n=", sum(patients_group[,2]=="P3"), ")")),
-    lty=1, col=c("blue","red","black"))
+#ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
+#v =  patients_group$group
+#sf = survival::survfit(ss ~ v)
+#plot(
+#  sf, 
+#  xlab="Time in months",
+#  xlim=c(0,80),
+#  ylab="Overall survival", 
+#  main=paste0(" pv_cox=", signif(pvcox, 3),
+#              "\n pv_logrank=", signif(logrank,3),
+#              "\n HR=", signif(hr,3)),
+#  col=c("blue","red","black")
+#)
+#legend("topright",
+#    c(paste0("P1 (n=", sum(patients_group[,2]=="P1"), ")"),
+#      paste0("P2 (n=", sum(patients_group[,2]=="P2"), ")"),
+#      paste0("P3 (n=", sum(patients_group[,2]=="P3"), ")")),
+#    lty=1, col=c("blue","red","black"))
 
+ector::plot_survival_grp(e, idx_c, patients_group$group)
 ```
 
 

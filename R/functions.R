@@ -46,6 +46,8 @@ plot_gene_expr = function(gs, d, e, idx_n, thresh_func=ector::m3sd) {
   legend("topleft", c("mean", "threshold"), col=1:2, lty=1)
 }
 
+
+
 #' Proportion of patients with ectopic gene expression 
 #'
 #' This function calculates, for each gene, the proportion of patients in which the expression is ectopic 
@@ -82,7 +84,7 @@ compute_cox_pv = function (d, e, idx_c, idx_n, thresh_func=ector::m3sd) {
   pvcox = signif(sf$wald["pvalue"], digits=3)
   hr = signif(sf$coef[2], digits=3)
   logrank = signif(sf$logtest["pvalue"], digits=3)
-  res = c(pvcox, hr, logrank)
+  res = c(pvcox=pvcox, hr=hr, logrank=logrank)
   return(res)
 }
 
@@ -103,27 +105,23 @@ compute_cox_pv = function (d, e, idx_c, idx_n, thresh_func=ector::m3sd) {
 #' @export
 plot_survival = function(gs, d, e, idx_c, idx_n, thresh_func=ector::m3sd) {
   expr = d[gs,]
-  ector::compute_cox_pv(expr, idx_c, idx_n, e, thresh_func=thresh_func)
   ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
   v = expr[idx_c]>thresh_func(expr[idx_n])
   sf = survival::survfit(ss ~ v)
-  pvcox = signif(sf$wald["pvalue"], digits=3)
-  hr = signif(sf$coef[2], digits=3)
-  logrank = signif(sf$logtest["pvalue"], digits=3)
   plot(
     sf, 
     xlab="Time in months",
     xlim=c(0,80),
     ylab="Overall survival", 
-    main=paste0(gs, " pv_cox=", signif(pvcox[gs], 3),
-                "\n pv_logrank=", signif(logrank[gs],3),
-                "\n HR=", signif(hr[gs],3)),
+    main=paste0(gs, " pv_cox=", signif(cox_results[gs,]$pvcox, 3),
+                "\n pv_logrank=", signif(cox_results[gs,]$logrank,3),
+                "\n HR=", signif(cox_results[gs,]$hr,3)),
     col=c(4,2)
   )
   legend("topright",
-         c(paste0("Off (n=", sum(expr[idx_c]<=thresh_func(expr[idx_n])), ")"),
-           paste0("On (n=", sum(expr[idx_c]>thresh_func(expr[idx_n])), ")")),
-         lty=1, col=c(4,2))
+        c(paste0("Off (n=", sum(expr[idx_c]<=thresh_func(expr[idx_n])), ")"),
+        paste0("On (n=", sum(expr[idx_c]>thresh_func(expr[idx_n])), ")")),
+  lty=1, col=c(4,2))
 }
 
 
@@ -144,7 +142,7 @@ compute_cox_pv_grp = function(e, idx_c, x) {
   pvcox = signif(sf$wald["pvalue"], digits=3)
   hr = signif(sf$coef[2], digits=3)
   logrank = signif(sf$logtest["pvalue"], digits=3)
-  res = c(pvcox, hr, logrank)
+  res = c(pvcox=pvcox, hr=hr, logrank=logrank)
   return(res)
 } 
 
@@ -161,26 +159,22 @@ compute_cox_pv_grp = function(e, idx_c, x) {
 #' @importFrom graphics plot
 #' @export
 plot_survival_grp = function(e, idx_c, x) {
-  ector::compute_cox_pv_grp(e, idx_c, x)
   ss = survival::Surv(e[idx_c,]$os_months, e[idx_c,]$os_censor)
-  v = x
+  v =  x
   sf = survival::survfit(ss ~ v)
-  pvcox = signif(sf$wald["pvalue"], digits=3)
-  hr = signif(sf$coef[2], digits=3)
-  logrank = signif(sf$logtest["pvalue"], digits=3)
   plot(
     sf, 
     xlab="Time in months",
     xlim=c(0,80),
     ylab="Overall survival", 
-    main=paste0(" pv_cox=", signif(pvcox, 3),
-                "\n pv_logrank=", signif(logrank,3),
-                "\n HR=", signif(hr,3)),
+    main=paste0(" pv_cox=", signif(cox_results_grp[1], 3),
+                "\n pv_logrank=", signif(cox_results_grp[3],3),
+                "\n HR=", signif(cox_results_grp[2],3)),
     col=c("blue","red","black")
   )
   legend("topright",
-         c(paste0("P1 (n=", sum(x==1), ")"),
-           paste0("P2 (n=", sum(x==2), ")"),
-           paste0("P3 (n=", sum(x==3), ")")),
+         c(paste0("P1 (n=", sum(patients_group[,2]=="P1"), ")"),
+           paste0("P2 (n=", sum(patients_group[,2]=="P2"), ")"),
+           paste0("P3 (n=", sum(patients_group[,2]=="P3"), ")")),
          lty=1, col=c("blue","red","black"))
 }
